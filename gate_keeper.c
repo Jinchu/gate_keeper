@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/select.h>
@@ -45,21 +46,56 @@ int check_args(int argc, char *argv[], struct gate *dest)
 }
 
 /**
- * Forks the process. The child process will be replaced with service ssh stop
+ * Forks the process. The child process will be replaced with service ssh
  * process image
  *
  * @param the gate context
+ * @param operation to be done to the sshd (start/stop)
+ *
+ * Return 1 when successful, 0 otherwise
  */
-static inline void stop_sshd(struct gate *my_gate)
+static inline void change_state_sshd(struct gate *my_gate, char *operation)
 {
   int ret;
+  pid_t child_pid;
 
-  ret = fork();
-  if (ret == 0)
+  printf("%s\n", operation);
+  child_pid = fork();
+  if (child_pid == 0)
     {
-      ret = execl("/usr/sbin/service", "service", "ssh", "stop", NULL);
+      if (strncmp(operation, "stop", 4) == 0)
+        {
+          execl("/usr/sbin/service", "service", "ssh", "stop", NULL);
+        }
+      else if (strncmp(operation, "start", 4) == 0)
+        {
+          execl("/usr/sbin/service", "service", "ssh", "start", NULL);
+        }
+      return;
+  }
+
+  child_pid = waitpid(child_pid, &ret, 0);
+  printf("child pid: %d\n", child_pid);
+  if (WIFEXITED(ret))
+    {
+      printf("sshd %s successful\n", operation);
+    }
+  else
+    {
+      printf("Problems with sshd %s\n", operation);
     }
 
+}
+
+static inline void start_sshd(struct gate *my_gate)
+{
+  change_state_sshd(my_gate, "start");
+  my_gate->port_open = true;
+}
+
+static inline void stop_sshd(struct gate *my_gate)
+{
+  change_state_sshd(my_gate, "stop");
   my_gate->port_open = false;
 }
 
@@ -149,10 +185,8 @@ static bool preconditions_met(struct gate *my_gate)
  *
  * @param the gate context
  */
-static void start_service(struct gate *my_gate)
+static void check_and_start_service(struct gate *my_gate)
 {
-  int ret;
-
   if (preconditions_met(my_gate))
     {
       if (my_gate->port_open)
@@ -161,24 +195,18 @@ static void start_service(struct gate *my_gate)
 	  return;
 	}
       printf("starting...\n");
-      ret = fork();
-      if (ret == 0)
-	{
-	  ret = execl("/usr/sbin/service", "service", "ssh", "start", NULL);
-	}
-
-      printf("[service] %d\n", ret);
-      my_gate->port_open = true;
+      start_sshd(my_gate);
     }
   else
     {
       printf("conditions failed\n");
-      ret = fork();
-      if (ret == 0)
-	{
-	  ret = execl("/usr/sbin/service", "service", "ssh", "stop", NULL);
-	}
-      sleep(2);
+
+      // Close the SSH to prevent accidental openings
+      if (my_gate->port_open)
+        {
+          stop_sshd(my_gate);
+        }
+
       printf("continuing operation\n");
     }
 }
@@ -234,7 +262,7 @@ static void handle_incoming_conn(fd_set *rfds, struct gate *my_gate)
 	  printf("the sender addresses do not match\n");
 	}
 
-      start_service(my_gate);
+      check_and_start_service(my_gate);
     }
 }
 

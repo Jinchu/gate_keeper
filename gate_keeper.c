@@ -190,10 +190,10 @@ static void check_and_start_service(struct gate *my_gate)
   if (preconditions_met(my_gate))
     {
       if (my_gate->port_open)
-	{
-	  printf("service already running..\n");
-	  return;
-	}
+        {
+          printf("service already running..\n");
+          return;
+        }
       printf("starting...\n");
       start_sshd(my_gate);
     }
@@ -236,31 +236,31 @@ static void handle_incoming_conn(fd_set *rfds, struct gate *my_gate)
 
       /* Update the time stamp only when the sender matches to the OG */
       if (second_sender.sin_family == og_sender.sin_family &&
-	  second_sender.sin_addr.s_addr == og_sender.sin_addr.s_addr)
-	{
-	  my_gate->port_2.timestamp = clock();
-	}
+	        second_sender.sin_addr.s_addr == og_sender.sin_addr.s_addr)
+        {
+          my_gate->port_2.timestamp = clock();
+        }
       else
-	{
-	  printf("the sender addresses do not match\n");
-	}
+        {
+          printf("the sender addresses do not match\n");
+        }
     }
 
   if (FD_ISSET(my_gate->port_3.sock_fd_4, rfds))
     {
       printf("hit my third port\n");
       recvfrom(my_gate->port_3.sock_fd_4, buf, MAXLINE, 0,
-	       (struct sockaddr *)&second_sender, &addr_len);
+	             (struct sockaddr *)&second_sender, &addr_len);
       /* Update the time stamp only when the sender matches to the OG */
       if (second_sender.sin_family == og_sender.sin_family &&
-	  second_sender.sin_addr.s_addr == og_sender.sin_addr.s_addr)
-	{
-	  my_gate->port_3.timestamp = clock();
-	}
+	        second_sender.sin_addr.s_addr == og_sender.sin_addr.s_addr)
+        {
+          my_gate->port_3.timestamp = clock();
+        }
       else
-	{
-	  printf("the sender addresses do not match\n");
-	}
+        {
+          printf("the sender addresses do not match\n");
+        }
 
       check_and_start_service(my_gate);
     }
@@ -339,32 +339,32 @@ int main(int argc, char *argv[])
 
       ret = select((my_gate.port_3.sock_fd_4 + 2), &rfds, NULL, NULL, &tv);
       if (ret == -1)
-	{
-	  perror("select()");
-	  return -1;
-	}
+        {
+          perror("select()");
+          return -1;
+        }
       else if (ret)
-	{
-	  handle_incoming_conn(&rfds, &my_gate);
-	}
+        {
+          handle_incoming_conn(&rfds, &my_gate);
+        }
       else
-	{
-	  printf("timeout: ");
-	  if (my_gate.port_open)
-	    {
-	      printf("closing gate\n");
-	      stop_sshd(&my_gate);
-	    }
-	  else
-	    {
-	      printf("gate already closed\n");
-	    }
+        {
+          printf("timeout: ");
+          if (my_gate.port_open)
+            {
+              printf("closing gate\n");
+              stop_sshd(&my_gate);
+            }
+          else
+            {
+              printf("gate already closed\n");
+            }
 
-	  my_gate.port_1.timestamp = 0;
-	  my_gate.port_2.timestamp = 0;
-	  my_gate.port_3.timestamp = 0;
+          my_gate.port_1.timestamp = 0;
+          my_gate.port_2.timestamp = 0;
+          my_gate.port_3.timestamp = 0;
 
-	}
+	    }
 
     }
 
